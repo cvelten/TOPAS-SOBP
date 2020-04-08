@@ -20,31 +20,75 @@ class SOBPSource(object):
 
     @staticmethod
     def get_p(energy, chi):
+        """Interpolate from recommended power law values.
+
+        Args:
+            energy (float): Maximum proton energy in MeV.
+            chi (float): SOBP width (fraction of the maximum range).
+
+        Returns:
+            float: Interpolated power law parameter.
+        """
+        # add a new energy/width column/row to the DataFrame
         tmp = SOBPSource.RecommendedValues.copy()
-        tmp.loc[chi] = None
-        tmp = tmp.sort_index().interpolate().transpose()
-        tmp.loc[energy] = None
-        tmp = tmp.sort_index().interpolate().transpose()
+        tmp.loc[chi, energy] = np.nan
+        tmp = tmp.sort_index(0).sort_index(1)
+        # interpolate width values for a given energy first
+        tmp = tmp.interpolate(method='index', axis='index')
+        # interpolate between different energies
+        tmp = tmp.interpolate(method='index', axis='columns')
         return tmp.loc[chi, energy]
 
     @staticmethod
     def _rk(k, n, chi, R0):
+        """Range of the k-th beamlet.
+
+        Args:
+            k (int): Number of the beamlet, within [0, n].
+            n (int): Maximum of beamlets.
+            chi (float): SOBP width (fraction of the maximum range).
+            R0 (float): Range of the highest energy proton.
+
+        Returns:
+            float: Proton range of the k-th beamlet
+        """
         return (1 - (1 - k / n) * chi) * R0
 
     @staticmethod
     def _ek(r_k, alpha, p0):
+        """Energy of the k-th beamlet.
+
+        Args:
+            r_k (float): Proton range of the k-th beamlet.
+            alpha (float): Power law scaling parameter .
+            p0 (float): Conventional power law parameter for energy-to-range conversion.
+
+        Returns:
+            float: Energy in MeV of the k-th beamlet."""
         return np.power(r_k / alpha, 1 / p0)
 
     @staticmethod
     def _wk(k, n, p):
+        """Weight of the k-th beamlet.
+
+        Args:
+            k (int): Number of the beamlet, within [0, n].
+            n (int): Maximum of beamlets.
+            p (float): Power law parameter p.
+
+        Returns:
+            float: Weight of the k-th beamlet.
+        """
         a = 1 / (2 * n)
         b = 1 - 1 / p
         if k == 0:
+            # k = 0: lowest energy beamlet
             return 1 - np.power(1 - a, b)
         elif k < n:
             return np.power(1 -
                             (k - 0.5) / n, b) - np.power(1 - (k + 0.5) / n, b)
         else:
+            # k = n: highest energy beamlet
             return np.power(a, b)
 
     def __init__(self, alpha=2.2E-3, p0=1.77):
@@ -56,7 +100,22 @@ class SOBPSource(object):
         pass
 
     def generate_weights(self, energy, chi, p, n=19, delta=0.05):
+        """Generate spread-out Bragg peak beamlet energies and weights.
+
+        Args:
+            energy (float): Maximum proton energy.
+            chi (float): SOBP width (fraction of the maximum range).
+            p (float): Power law parameter p.
+            n (int): Minimum number of beamlets.
+            delta (float): Beamlet spacing, used if it leads to more than n beamlets.
+
+        Returns:
+            tuple(list, list): List of beamlet energies and cumulative weights (TOPAS time points).
+        """
         R0 = self.alpha * np.power(energy, self.p0)
+
+        # set number of beamlets according to the minimum spacing (in centimeters)
+        # or use minimum number of beamlets
         n_ = int(np.ceil(chi * R0 / delta))
         n = n if n_ < n else n_
 
@@ -91,8 +150,7 @@ class SOBPSource(object):
 
 if __name__ == '__main__':
     parser = ArgumentParser(
-        description=
-        'Generate TOPAS time features to generate spread-out Bragg peaks for protons in water.'
+        description='Generate TOPAS time features to generate spread-out Bragg peaks for protons in water.'
     )
     parser.add_argument('-e',
                         '--energy',
@@ -109,8 +167,7 @@ if __name__ == '__main__':
         '--powerp',
         type=float,
         default=None,
-        help=
-        'power law parameter p; if empty will interpolate from recommended values'
+        help='power law parameter p; if empty will interpolate from recommended values'
     )
     parser.add_argument('-n',
                         '--nbeams',
@@ -132,6 +189,7 @@ if __name__ == '__main__':
     if args.powerp is None:
         args.powerp = SOBPSource.get_p(args.energy, args.chi)
 
+    # Create object with default parameters, calculate beam weights and print them to stdout
     source = SOBPSource()
     source.generate_weights(args.energy, args.chi, args.powerp, args.nbeams,
                             args.delta)
