@@ -139,7 +139,7 @@ class SOBPSource(object):
 
         print('s:Tf/BeamEnergy/Function = "Step"')
         print('dv:Tf/BeamEnergy/Times = {}'.format(n))
-        for t in self.T[1:]:
+        for t in self.T:
             print('{:.1f} '.format(t * 1000), end='')
         print('ms')
         print('dv:Tf/BeamEnergy/Values = {}'.format(n))
