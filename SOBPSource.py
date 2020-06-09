@@ -128,7 +128,7 @@ class SOBPSource(object):
             T.append(T[-1] + w)
 
         self.energy, self.chi = energy, chi
-        self.E, self.T = E, T
+        self.E, self.T = E, T[1:]
         return E, T
 
     def print(self):
