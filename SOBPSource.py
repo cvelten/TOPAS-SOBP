@@ -31,12 +31,13 @@ class SOBPSource(object):
         """
         # add a new energy/width column/row to the DataFrame
         tmp = SOBPSource.RecommendedValues.copy()
-        tmp.loc[chi, energy] = np.nan
-        tmp = tmp.sort_index(0).sort_index(1)
-        # interpolate width values for a given energy first
-        tmp = tmp.interpolate(method='index', axis='index')
-        # interpolate between different energies
-        tmp = tmp.interpolate(method='index', axis='columns')
+        if not chi in tmp.index or not energy in tmp.columns:
+            tmp.loc[chi, energy] = np.nan
+            tmp = tmp.sort_index(0).sort_index(1)
+            # interpolate width values for a given energy first
+            tmp = tmp.interpolate(method='index', axis='index')
+            # interpolate between different energies
+            tmp = tmp.interpolate(method='index', axis='columns')
         return tmp.loc[chi, energy]
 
     @staticmethod
@@ -184,7 +185,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.recommended:
-        print(SOBPSource.RecommendedValues)
+        print(SOBPSource.RecommendedValues, end='\n\n')
 
     if args.powerp is None:
         args.powerp = SOBPSource.get_p(args.energy, args.chi)
